@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>医疗健康数据仓库分层设计方案</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+            --border-color: #dee2e6;
+            --code-bg-color: #e9ecef;
+            --header-bg-color: #e9ecef;
+            --sidebar-width: 260px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: #fff;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            display: flex;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            background-color: var(--bg-color);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+
+        .sidebar h3 {
+            margin-top: 0;
+            font-size: 1.2em;
+            color: var(--primary-color);
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .sidebar li a {
+            display: block;
+            padding: 8px 10px;
+            color: var(--secondary-color);
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.95em;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        
+        .sidebar li a.sub-link {
+            padding-left: 25px;
+            font-size: 0.85em;
+        }
+
+        .sidebar li a:hover,
+        .sidebar li a.active {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+
+        .content {
+            margin-left: var(--sidebar-width);
+            padding: 30px 40px;
+            width: calc(100% - var(--sidebar-width));
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            color: #000;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-size: 2em;
+            color: var(--text-color);
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        h3 {
+            font-size: 1.5em;
+            color: var(--text-color);
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        
+        h4 {
+            font-size: 1.2em;
+            color: var(--primary-color);
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+
+        p, ul, ol {
+            margin-bottom: 1rem;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        code {
+            background-color: var(--code-bg-color);
+            padding: 0.2em 0.4em;
+            margin: 0;
+            font-size: 85%;
+            border-radius: 3px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+            font-size: 0.9em;
+        }
+
+        th, td {
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        thead th {
+            background-color: var(--header-bg-color);
+            font-weight: 600;
+        }
+
+        tbody tr:nth-of-type(odd) {
+            background-color: var(--bg-color);
+        }
+        
+        .group-header th {
+            background-color: #d4e3ff;
+            text-align: center;
+            font-style: italic;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        blockquote {
+            border-left: 4px solid var(--primary-color);
+            padding: 10px 20px;
+            margin: 20px 0;
+            background-color: var(--bg-color);
+            color: var(--secondary-color);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+            .content {
+                margin-left: 0;
+                padding: 20px;
+                width: 100%;
+            }
+            h1 { font-size: 2em; }
+            h2 { font-size: 1.7em; }
+            h3 { font-size: 1.3em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="sidebar">
+            <h3>导航目录</h3>
+            <ul>
+                <li><a href="#overview">1. 设计总览</a></li>
+                <li><a href="#business_matrix">2. 业务总线矩阵</a></li>
+                <li><a href="#layer_design">3. 数据分层详细设计</a>
+                    <ul>
+                         <li><a href="#ods_layer" class="sub-link">3.1 ODS层</a></li>
+                         <li><a href="#dwd_layer" class="sub-link">3.2 DWD层</a></li>
+                         <li><a href="#dim_layer" class="sub-link">3.3 DIM层</a></li>
+                         <li><a href="#dws_layer" class="sub-link">3.4 DWS层</a></li>
+                         <li><a href="#ads_layer" class="sub-link">3.5 ADS层</a></li>
+                    </ul>
+                </li>
+                <li><a href="#etl_process">4. 数据处理与ETL流程</a></li>
+                <li><a href="#standards">5. 设计规范与约定</a></li>
+            </ul>
+        </nav>
+
+        <main class="content">
+            <h1>博思云易据仓库分层设计方案</h1>
+
+            <section id="overview">
+                <h2>1. 设计总览</h2>
+                <h3 id="project_goals">1.1. 项目目标</h3>
+                <p>本数据仓库旨在整合医疗业务中产生的核心数据（如就诊、诊断、费用、结算等），构建一个统一、规范、可扩展的数据平台。其主要目标包括：</p>
+                <ul>
+                    <li><strong>支持运营分析</strong>：为医疗机构提供就诊人次、费用构成、住院天数等核心运营指标的监控与分析。</li>
+                    <li><strong>驱动临床研究</strong>：支持按疾病、药品、诊疗项目等多维度进行深度分析，赋能疾病研究和疗效评估。</li>
+                    <li><strong>赋能医保控费</strong>：对医保目录内外费用、自付比例、基金支出等进行精细化分析，为医保控费提供数据支持。</li>
+                    <li><strong>构建用户画像</strong>：为患者构建精准的360度画像，支持个性化服务和风险预警。</li>
+                    <li><strong>提升决策效率</strong>：通过可视化的报表和仪表盘，为管理层提供及时、准确的决策依据。</li>
+                </ul>
+
+                <h3 id="architecture">1.2. 架构分层</h3>
+                <p>为保证数据的清晰、解耦和高效复用，采用的数据仓库分层架构：</p>
+                <ul>
+                    <li><strong>ODS (Operational Data Store) - 操作数据层</strong>: 业务系统原始数据的快照，作为数据仓库的直接数据源，结构与源系统保持一致。</li>
+                    <li><strong>DWD (Data Warehouse Detail) - 明细数据层</strong>: 对ODS层数据进行清洗、格式统一、规范化处理，形成以业务过程为核心的原子事实表。</li>
+                    <li><strong>DIM (Dimension) - 维度数据层</strong>: 高度抽象、标准化的公共维度信息，为事实表提供分析上下文。</li>
+                    <li><strong>DWS (Data Warehouse Summary) - 汇总数据层</strong>: 面向特定分析主题，对DWD层数据进行轻度聚合，形成跨业务过程的汇总宽表。</li>
+                    <li><strong>ADS (Application Data Service) - 应用数据层</strong>: 直接面向最终应用（如BI报表、用户标签、API服务）的数据层，提供最终结果。</li>
+                </ul>
+
+                <h3 id="design_philosophy">1.3. 核心设计理念</h3>
+                <ul>
+                    <li><strong>业务总线驱动</strong>: 基于Kimball理论，通过业务总线矩阵规划事实与维度的关系，确保模型的一致性。</li>
+                    <li><strong>事实与维度分离</strong>: 严格区分业务过程（事实）和分析环境（维度），保证模型的灵活性和可扩展性。</li>
+                    <li><strong>精确的医保模型</strong>: 通过独立的结算事实表和细粒度的费用明细，精确反映医保结算过程和费用属性。</li>
+                    <li><strong>缓慢变化维 (SCD2)</strong>: 对关键维度（如患者、机构）采用拉链表设计，保留历史快照，支持精准的历史回溯分析。</li>
+                </ul>
+            </section>
+
+            <section id="business_matrix">
+                <h2>2. 业务总线矩阵 (Business Matrix)</h2>
+                <p>业务总线矩阵定义了核心业务过程与分析维度的关系，是数据仓库建模的蓝图。</p>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>业务过程 (事实表)</th>
+                                <th>患者维</th>
+                                <th>机构维</th>
+                                <th>科室维</th>
+                                <th>疾病维</th>
+                                <th>药品维</th>
+                                <th>诊疗/耗材维</th>
+                                <th>日期维</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>就诊事件</strong> <br> <code>dwd_fact_medical_visit</code></td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;"></td>
+                                <td style="text-align:center;"></td>
+                                <td style="text-align:center;">✔️</td>
+                            </tr>
+                            <tr>
+                                <td><strong>结算事件</strong> <br> <code>dwd_fact_settlement</code></td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;"></td>
+                                <td style="text-align:center;"></td>
+                                <td style="text-align:center;"></td>
+                                <td style="text-align:center;"></td>
+                                <td style="text-align:center;">✔️</td>
+                            </tr>
+                            <tr>
+                                <td><strong>费用明细</strong> <br> <code>dwd_fact_charge_detail</code></td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;"></td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;">✔️</td>
+                            </tr>
+                            <tr>
+                                <td><strong>诊断事件</strong> <br> <code>dwd_fact_diagnosis</code></td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;">✔️</td>
+                                <td style="text-align:center;"></td>
+                                <td style="text-align:center;"></td>
+                                <td style="text-align:center;">✔️</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="layer_design">
+                <h2>3. 数据分层详细设计</h2>
+
+                <h3 id="ods_layer">3.1. ODS (Operational Data Store) - 操作数据层</h3>
+                <blockquote>此层为数据源的直接映射，保留原始字段和结构，按天分区(<code>dt</code>)。</blockquote>
+
+                <h3 id="dwd_layer">3.2. DWD (Data Warehouse Detail) - 明细数据层</h3>
+                <blockquote>本层对ODS数据进行清洗和标准化，构建原子事实表，使用代理键(<code>_sk</code>)关联维度表。</blockquote>
+                
+                <!-- DWD Tables Start -->
+                <h4><code>dwd_fact_medical_visit</code> - 就诊事实表</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>visit_id</code></td><td>就诊ID（主键）</td><td>int</td><td>粒度：每次就诊</td></tr>
+                            <tr><td><code>patient_sk</code></td><td>患者代理键（外键）</td><td>int</td><td>关联 <code>dim_patient</code></td></tr>
+                            <tr><td><code>inst_sk</code></td><td>医疗机构代理键（外键）</td><td>int</td><td>关联 <code>dim_medical_institution</code></td></tr>
+                            <tr><td><code>department_sk</code></td><td>科室代理键（外键）</td><td>int</td><td>关联 <code>dim_department</code></td></tr>
+                            <tr><td><code>primary_diagnosis_id</code></td><td>主要诊断ID（外键）</td><td>int</td><td>关联 <code>dim_disease</code></td></tr>
+                            <tr><td><code>visit_type</code></td><td>就诊类型</td><td>varchar(50)</td><td>'门诊' | '住院'</td></tr>
+                            <tr><td><code>visit_date_key</code></td><td>就诊日期KEY</td><td>int</td><td>关联 <code>dim_date</code> (YYYYMMDD)</td></tr>
+                            <tr><td><code>admission_date_key</code></td><td>入院日期KEY</td><td>int</td><td>住院适用</td></tr>
+                            <tr><td><code>discharge_date_key</code></td><td>出院日期KEY</td><td>int</td><td>住院适用</td></tr>
+                            <tr><td><code>hospitalization_days</code></td><td>住院天数</td><td>int</td><td>出院日期 - 入院日期</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4><code>dwd_fact_settlement</code> - 结算事实表</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>settlement_id</code></td><td>结算ID（主键）</td><td>int</td><td>粒度：每次结算</td></tr>
+                            <tr><td><code>visit_id</code></td><td>就诊ID（外键）</td><td>int</td><td></td></tr>
+                            <tr><td><code>patient_sk</code></td><td>患者代理键（外键）</td><td>int</td><td></td></tr>
+                            <tr><td><code>settlement_date_key</code></td><td>结算日期KEY</td><td>int</td><td>关联 <code>dim_date</code></td></tr>
+                            <tr><td><code>invoice_code</code></td><td>票据代码</td><td>varchar(50)</td><td>退化维度</td></tr>
+                            <tr><td><code>invoice_number</code></td><td>票据号码</td><td>varchar(50)</td><td>退化维度</td></tr>
+                            <tr><td><code>total_amount</code></td><td>总金额</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>insurance_fund_payment</code></td><td>医保统筹基金支付</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>personal_account_payment</code></td><td>个人账户支付</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>personal_cash_payment</code></td><td>个人现金支付</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>prepayment_amount</code></td><td>预缴金额</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>refund_amount</code></td><td>退费金额</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>additional_payment_amount</code></td><td>补缴金额</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>is_settlement</code></td><td>是否结算</td><td>boolean</td><td></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h4><code>dwd_fact_charge_detail</code> - 费用明细事实表</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>charge_detail_id</code></td><td>费用明细ID（主键）</td><td>int</td><td>粒度：每笔费用明细</td></tr>
+                            <tr><td><code>visit_id</code></td><td>就诊ID（外键）</td><td>int</td><td></td></tr>
+                            <tr><td><code>settlement_id</code></td><td>结算ID（外键）</td><td>int</td><td>关联结算事件</td></tr>
+                            <tr><td><code>patient_sk</code></td><td>患者代理键（外键）</td><td>int</td><td></td></tr>
+                            <tr><td><code>charge_date_key</code></td><td>费用发生日期KEY</td><td>int</td><td></td></tr>
+                            <tr><td><code>charge_item_type</code></td><td>费用项目类型</td><td>varchar(50)</td><td>'药品' | '诊疗' | '耗材'</td></tr>
+                            <tr><td><code>charge_item_id</code></td><td>费用项目ID</td><td>int</td><td>关联具体维度表</td></tr>
+                            <tr><td><code>insurance_item_level</code></td><td>医保类型</td><td>varchar(20)</td><td>退化维度, '甲类','乙类','丙类'</td></tr>
+                            <tr><td><code>self_payment_ratio_actual</code></td><td>自付比例</td><td>decimal(5,4)</td><td>记录当时实际的自付比例</td></tr>
+                            <tr><td><code>quantity</code></td><td>数量</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>unit_price</code></td><td>单价</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>amount</code></td><td>总金额</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>insurance_payment</code></td><td>医保支付金额</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>self_payment</code></td><td>个人支付金额</td><td>decimal(18,2)</td><td></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h4><code>dwd_fact_diagnosis</code> - 诊断事实表</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>diagnosis_record_id</code></td><td>诊断记录ID（主键）</td><td>int</td><td></td></tr>
+                            <tr><td><code>visit_id</code></td><td>就诊ID（外键）</td><td>int</td><td></td></tr>
+                            <tr><td><code>patient_sk</code></td><td>患者代理键（外键）</td><td>int</td><td></td></tr>
+                            <tr><td><code>disease_id</code></td><td>疾病ID（外键）</td><td>int</td><td></td></tr>
+                            <tr><td><code>first_diagnosis_flag</code></td><td>首次确诊标志</td><td>boolean</td><td></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- DWD Tables End -->
+
+                <h3 id="dim_layer">3.3. DIM (Dimension) - 维度数据层</h3>
+                <blockquote>公共维度层，对关键维度采用SCD2（拉链表）设计。</blockquote>
+                
+                <!-- DIM Tables Start -->
+                <h4><code>dim_patient</code> - 患者维度表(SCD2)</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>核心字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>patient_sk</code></td><td>患者代理键 (主键)</td><td>int</td><td></td></tr>
+                            <tr><td><code>patient_id</code></td><td>患者业务ID</td><td>int</td><td></td></tr>
+                            <tr><td><code>patient_name</code></td><td>患者姓名</td><td>varchar(100)</td><td></td></tr>
+                            <tr><td><code>gender</code></td><td>性别</td><td>varchar(10)</td><td></td></tr>
+                            <tr><td><code>birth_date</code></td><td>出生日期</td><td>date</td><td></td></tr>
+                            <tr><td><code>id_number</code></td><td>身份证号</td><td>varchar(18)</td><td></td></tr>
+                            <tr><td><code>education_level</code></td><td>学历</td><td>varchar(50)</td><td></td></tr>
+                            <tr><td><code>insurance_type</code></td><td>医保类型</td><td>varchar(50)</td><td></td></tr>
+                            <tr><td><code>insurance_Code</code></td><td>医保编号</td><td>varchar(50)</td><td></td></tr>
+                            <tr><td><code>start_date</code></td><td>生效日期</td><td>date</td><td>拉链表字段</td></tr>
+                            <tr><td><code>end_date</code></td><td>失效日期</td><td>date</td><td>拉链表字段</td></tr>
+                            <tr><td><code>is_current</code></td><td>是否当前版本</td><td>boolean</td><td>拉链表字段</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h4><code>dim_medical_institution</code> - 医疗机构维度表(SCD2)</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>核心字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>inst_sk</code></td><td>机构代理键 (主键)</td><td>int</td><td></td></tr>
+                            <tr><td><code>medical_institution_id</code></td><td>机构业务ID</td><td>int</td><td></td></tr>
+                            <tr><td><code>medical_institution_name</code></td><td>医疗机构名称</td><td>varchar(100)</td><td></td></tr>
+                            <tr><td><code>province</code></td><td>所在省份</td><td>varchar(50)</td><td></td></tr>
+                            <tr><td><code>city</code></td><td>所在城市</td><td>varchar(50)</td><td></td></tr>
+                            <tr><td><code>hospital_level</code></td><td>医疗机构等级</td><td>varchar(50)</td><td>如: '三级', '二级'</td></tr>
+                            <tr><td><code>start_date</code></td><td>生效日期</td><td>date</td><td>拉链表字段</td></tr>
+                            <tr><td><code>end_date</code></td><td>失效日期</td><td>date</td><td>拉链表字段</td></tr>
+                            <tr><td><code>is_current</code></td><td>是否当前版本</td><td>boolean</td><td>拉链表字段</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4><code>dim_department</code> - 科室维度表(SCD2)</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>核心字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>department_sk</code></td><td>科室代理键 (主键)</td><td>int</td><td></td></tr>
+                            <tr><td><code>department_id</code></td><td>科室业务ID</td><td>int</td><td></td></tr>
+                            <tr><td><code>department_name</code></td><td>科室名称</td><td>varchar(100)</td><td></td></tr>
+                            <tr><td><code>start_date</code></td><td>生效日期</td><td>date</td><td>拉链表字段</td></tr>
+                            <tr><td><code>end_date</code></td><td>失效日期</td><td>date</td><td>拉链表字段</td></tr>
+                            <tr><td><code>is_current</code></td><td>是否当前版本</td><td>boolean</td><td>拉链表字段</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h4><code>dim_disease</code> - 疾病维度表</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>核心字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>disease_id</code></td><td>疾病ID（主键）</td><td>int</td><td>静态维度</td></tr>
+                            <tr><td><code>disease_name</code></td><td>疾病名称</td><td>varchar(100)</td><td></td></tr>
+                            <tr><td><code>icd_code</code></td><td>ICD编码</td><td>varchar(50)</td><td></td></tr>
+                            <tr><td><code>disease_category</code></td><td>疾病类别</td><td>varchar(50)</td><td></td></tr>
+                            <tr><td><code>is_major_disease</code></td><td>是否重大疾病</td><td>boolean</td><td></td></tr>
+                            <tr><td><code>is_chronic_disease</code></td><td>是否慢性病</td><td>boolean</td><td></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h4><code>dim_drug</code> - 药品维度表</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>核心字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>drug_id</code></td><td>药品ID（主键）</td><td>int</td><td>静态维度</td></tr>
+                            <tr><td><code>drug_name</code></td><td>药品名称</td><td>varchar(100)</td><td></td></tr>
+                            <tr><td><code>charge_category</code></td><td>费用大类</td><td>varchar(50)</td><td>'西药费'|'中成药费'</td></tr>
+                            <tr><td><code>insurance_item_id</code></td><td>医保项目ID</td><td>int</td><td>关联 <code>dim_medical_item</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4><code>dim_treatment_item</code> - 诊疗项目维度表</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>核心字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>treatment_item_id</code></td><td>诊疗项目ID（主键）</td><td>int</td><td>静态维度</td></tr>
+                            <tr><td><code>item_name</code></td><td>项目名称</td><td>varchar(100)</td><td></td></tr>
+                            <tr><td><code>charge_category</code></td><td>费用大类</td><td>varchar(50)</td><td>'检查费'|'化验费'等</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4><code>dim_medical_consumable</code> - 卫生耗材维度表</h4>
+                 <div class="table-container">
+                    <table>
+                        <thead><tr><th>核心字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr></thead>
+                        <tbody>
+                           <tr><td><code>consumable_id</code></td><td>耗材ID（主键）</td><td>int</td><td>静态维度</td></tr>
+                           <tr><td><code>consumable_name</code></td><td>耗材名称</td><td>varchar(100)</td><td></td></tr>
+                           <tr><td><code>charge_category</code></td><td>费用大类</td><td>varchar(50)</td><td>'卫生材料费'</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4><code>dim_date</code> - 日期维度表</h4>
+                 <div class="table-container">
+                    <table>
+                        <thead><tr><th>核心字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>date_key</code></td><td>日期KEY（YYYYMMDD）</td><td>int</td><td></td></tr>
+                            <tr><td><code>full_date</code></td><td>日期</td><td>date</td><td></td></tr>
+                            <tr><td><code>year</code></td><td>年</td><td>int</td><td></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- DIM Tables End -->
+
+                <h3 id="dws_layer">3.4. DWS (Data Warehouse Summary) - 汇总数据层</h3>
+                <blockquote>面向分析主题的汇总层，通过冗余维度和预聚合指标，提升查询性能。</blockquote>
+
+                <!-- DWS Tables Start -->
+                <h4><code>dws_patient_visit_wide</code> - 患者单次就诊宽表</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>visit_id</code></td><td>就诊ID（主键）</td><td>int</td><td>粒度: 每次就诊</td></tr>
+                            <tr><td><code>patient_sk</code></td><td>患者代理键</td><td>int</td><td></td></tr>
+                            <tr><td><code>patient_name</code></td><td>患者姓名</td><td>varchar(100)</td><td>冗余维度</td></tr>
+                            <tr><td><code>inst_name</code></td><td>机构名称</td><td>varchar(100)</td><td>冗余维度</td></tr>
+                            <tr><td><code>department_name</code></td><td>科室名称</td><td>varchar(100)</td><td>冗余维度</td></tr>
+                            <tr><td><code>primary_diagnosis_name</code></td><td>主要诊断</td><td>varchar(100)</td><td>冗余维度</td></tr>
+                            <tr><td><code>visit_type</code></td><td>就诊类型</td><td>varchar(50)</td><td></td></tr>
+                            <tr><td><code>visit_date</code></td><td>就诊日期</td><td>date</td><td></td></tr>
+                            <tr><td><code>hospitalization_days</code></td><td>住院天数</td><td>int</td><td></td></tr>
+                            <tr><td><code>total_cost</code></td><td>总费用</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>drug_cost</code></td><td>药品费用</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>treatment_cost</code></td><td>诊疗费用</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>consumable_cost</code></td><td>耗材费用</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>insurance_payment</code></td><td>医保支付总额</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>self_payment</code></td><td>个人支付总额</td><td>decimal(18,2)</td><td></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4><code>dws_inst_operation_monthly</code> - 机构运营月度汇总表</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>month_key</code></td><td>月份(YYYYMM)</td><td>int</td><td>粒度: 月 x 机构</td></tr>
+                            <tr><td><code>medical_institution_id</code></td><td>医疗机构ID</td><td>int</td><td></td></tr>
+                            <tr><td><code>visit_count</code></td><td>就诊次数</td><td>int</td><td></td></tr>
+                            <tr><td><code>patient_count</code></td><td>就诊人数(去重)</td><td>int</td><td></td></tr>
+                            <tr><td><code>total_hospital_days</code></td><td>总住院天数</td><td>int</td><td></td></tr>
+                            <tr><td><code>total_cost</code></td><td>总费用</td><td>decimal(18,2)</td><td></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4><code>dws_disease_analysis_monthly</code> - 疾病分析月度汇总表</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>字段名</th><th>字段说明</th><th>数据类型</th><th>备注</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>month_key</code></td><td>月份(YYYYMM)</td><td>int</td><td>粒度: 月 x 疾病</td></tr>
+                            <tr><td><code>disease_id</code></td><td>疾病ID</td><td>int</td><td></td></tr>
+                            <tr><td><code>disease_name</code></td><td>疾病名称</td><td>varchar(100)</td><td>冗余维度，方便使用</td></tr>
+                            <tr><td><code>visit_count</code></td><td>就诊次数</td><td>int</td><td></td></tr>
+                            <tr><td><code>patient_count</code></td><td>就诊人数</td><td>int</td><td></td></tr>
+                            <tr class="group-header"><th colspan="4">--- 总体费用指标 ---</th></tr>
+                            <tr><td><code>total_cost</code></td><td>总费用</td><td>decimal(18,2)</td><td>该疾病下所有费用总和</td></tr>
+                            <tr><td><code>avg_visit_cost</code></td><td>次均费用</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>avg_patient_cost</code></td><td>人均费用</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr class="group-header"><th colspan="4">--- 费用结构 - 按项目类型 ---</th></tr>
+                            <tr><td><code>drug_cost</code></td><td>药品费用</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>drug_cost_ratio</code></td><td>药品费用占比</td><td>decimal(5,4)</td><td>drug_cost / total_cost</td></tr>
+                            <tr><td><code>treatment_cost</code></td><td>诊疗费用</td><td>decimal(18,2)</td><td>检查+化验+手术+治疗</td></tr>
+                            <tr><td><code>treatment_cost_ratio</code></td><td>诊疗费用占比</td><td>decimal(5,4)</td><td>treatment_cost / total_cost</td></tr>
+                            <tr><td><code>consumable_cost</code></td><td>耗材费用</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>consumable_cost_ratio</code></td><td>耗材费用占比</td><td>decimal(5,4)</td><td>consumable_cost / total_cost</td></tr>
+                            <tr class="group-header"><th colspan="4">--- 费用结构 - 按医保类别 ---</th></tr>
+                            <tr><td><code>class_a_cost</code></td><td>甲类费用</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>class_b_cost</code></td><td>乙类费用</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>self_funded_item_cost</code></td><td>丙类费用</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>insurance_payment</code></td><td>医保支付总额</td><td>decimal(18,2)</td><td>基金+个账支付总额</td></tr>
+                            <tr><td><code>self_payment</code></td><td>个人支付总额</td><td>decimal(18,2)</td><td></td></tr>
+                            <tr><td><code>insurance_payment_ratio</code></td><td>医保报销比例</td><td>decimal(5,4)</td><td>insurance_payment / total_cost</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- DWS Tables End -->
+                
+                <h3 id="ads_layer">3.5. ADS (Application Data Service) - 应用数据层</h3>
+                <blockquote>直接服务于报表、标签或应用的最终结果表，字段和格式高度定制化。</blockquote>
+                <p><strong>示例表:</strong></p>
+                <ul>
+                    <li><code>ads_hospital_operation_dashboard</code>: 医院运营核心指标仪表盘 (数据源: <code>dws_inst_operation_monthly</code>)</li>
+                    <li><code>ads_disease_cost_analysis_report</code>: 重点疾病费用构成分析报表 (数据源: <code>dws_disease_analysis_monthly</code>)</li>
+                    <li><code>ads_patient_profile_tags</code>: 患者画像标签表 (数据源: <code>dwd</code>, <code>dim</code>, <code>dws</code> 各层)</li>
+                    <li><code>ads_patient_360_profile_api</code>: 患者360视图接口表 (数据源: <code>dws_patient_visit_wide</code>, <code>dim_patient</code>)</li>
+                </ul>
+            </section>
+            
+            <section id="etl_process">
+                <h2>4. 数据处理与ETL流程</h2>
+                <h3 id="ods_loading">4.1. ODS层加载</h3>
+                <ul>
+                    <li><strong>策略</strong>: 采用全量或增量方式每日同步。对于业务表，推荐使用基于时间戳或状态字段的增量同步；对于配置表，可采用全量同步。</li>
+                    <li><strong>工具</strong>: Sqoop、DataX、Flink CDC等。</li>
+                    <li><strong>分区</strong>: 所有ODS表统一按数据加载日期 <code>dt</code> (格式: <code>YYYY-MM-DD</code>) 进行分区存储。</li>
+                </ul>
+
+                <h3 id="dim_processing">4.2. DIM层加工</h3>
+                <ul>
+                    <li><strong>核心任务</strong>:
+                        <ol>
+                            <li><strong>抽取维度属性</strong>: 从多个ODS表中抽取所需字段，合并成一个完整的维度实体。</li>
+                            <li><strong>生成代理键</strong>: 为每条维度记录生成唯一的代理键 <code>_sk</code>。</li>
+                            <li><strong>拉链表处理 (SCD2)</strong>: 每日加载时，将新数据与前一日的维度表全量进行比较，对新增和变更记录进行处理（更新旧记录的<code>end_date</code>和<code>is_current</code>，插入新记录）。</li>
+                        </ol>
+                    </li>
+                </ul>
+
+                <h3 id="dwd_processing">4.3. DWD层加工</h3>
+                <ul>
+                    <li><strong>核心任务</strong>:
+                        <ol>
+                            <li><strong>数据清洗与转换</strong>: 处理空值、异常值，统一日期和编码格式。</li>
+                            <li><strong>关联维度</strong>: 使用事实表中的业务外键与维度表关联，根据事实发生日期查找SCD2维度表中对应的代理键 <code>_sk</code>。</li>
+                        </ol>
+                    </li>
+                    <li><strong>ETL逻辑示例</strong>:
+                        <ul>
+                            <li><strong><code>dwd_fact_medical_visit</code></strong>: 数据源于<code>ods_his_visits_df</code>，关联各维度获取<code>_sk</code>键。</li>
+                            <li><strong><code>dwd_fact_settlement</code></strong>: 数据源于<code>ods_his_invoices_df</code>，关联<code>dwd_fact_medical_visit</code>获取<code>visit_id</code>。</li>
+                            <li><strong><code>dwd_fact_charge_detail</code></strong>:
+                                <ul>
+                                    <li>数据源于<code>ods_his_charge_details_df</code>。</li>
+                                    <li>关联<code>dwd_fact_settlement</code>获取<code>settlement_id</code>。</li>
+                                    <li>通过费用项目自身的业务编码，关联<code>dim_drug</code>/<code>dim_treatment_item</code>/<code>dim_medical_consumable</code>，获取<code>insurance_item_id</code>。</li>
+                                    <li>通过<code>insurance_item_id</code>关联<code>dim_medical_item</code>，获取<code>insurance_item_level</code>等属性并退化到事实表。</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3 id="dws_ads_processing">4.4. DWS/ADS层加工</h3>
+                <ul>
+                    <li><strong>核心任务</strong>:
+                        <ol>
+                            <li><strong>聚合计算</strong>: 使用 <code>GROUP BY</code> 对DWD层数据按指定维度（如月、机构、疾病）进行聚合，计算各类指标。</li>
+                            <li><strong>维度冗余</strong>: 将常用的维度描述字段（如<code>patient_name</code>, <code>inst_name</code>）冗余到DWS宽表中，实现查询加速。</li>
+                        </ol>
+                    </li>
+                    <li><strong>产出</strong>: DWS层通常按月分区(<code>month_key</code>)。ADS层根据应用需求，可以是分区表或不分区的结果表。</li>
+                </ul>
+            </section>
+            
+            <section id="standards">
+                <h2>5. 设计规范与约定</h2>
+                <h3 id="naming_convention">5.1. 命名规范</h3>
+                <ul>
+                    <li><strong>表命名</strong>: <code>分层前缀_{主题/实体}_{表类型}</code>，如 <code>dwd_fact_medical_visit</code>, <code>dim_patient</code>。</li>
+                    <li><strong>字段命名</strong>: 采用小写字母和下划线 <code>_</code> 分隔，见名知意。主键为<code>id</code>，代理键为<code>_sk</code>，外键为<code>关联表_sk</code>或<code>关联实体_id</code>。</li>
+                </ul>
+
+                <h3 id="data_type_convention">5.2. 数据类型规范</h3>
+                <ul>
+                    <li><strong>金额</strong>: <code>DECIMAL(18, 2)</code> 或 <code>DECIMAL(18, 4)</code>，确保精度。</li>
+                    <li><strong>ID/Key</strong>: <code>INT</code> 或 <code>BIGINT</code>。</li>
+                    <li><strong>日期</strong>: 日期类型用 <code>DATE</code>，日期Key用 <code>INT</code> (YYYYMMDD)，月份Key用<code>INT</code> (YYYYMM)。</li>
+                    <li><strong>字符串</strong>: <code>VARCHAR(N)</code> 或 <code>STRING</code>。</li>
+                    <li><strong>标志位</strong>: <code>BOOLEAN</code> 或 <code>TINYINT</code> (0/1)。</li>
+                </ul>
+
+                <h3 id="dqc">5.3. 数据质量监控 (DQC)</h3>
+                <ul>
+                    <li><strong>及时性</strong>: 监控每日任务是否在规定时间内完成。</li>
+                    <li><strong>完整性</strong>: 监控核心表的记录数波动和核心字段的空值率。</li>
+                    <li><strong>准确性</strong>: 设置跨层级数据稽核规则（如<code>DWS层总费用</code> = <code>DWD层明细费用总和</code>），监控枚举值范围。</li>
+                    <li><strong>唯一性</strong>: 监控主键或业务键是否存在重复。</li>
+                </ul>
+            </section>
+        </main>
+    </div>
+</body>
+</html>
